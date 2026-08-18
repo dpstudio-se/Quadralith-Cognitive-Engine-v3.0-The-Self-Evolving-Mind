@@ -1,3 +1,11 @@
+```text
+******************************************************************************
+**                               VR-ASI-CO                                  **
+**  Quadralith-Cognitive-Engine-v3.0-The-Self-Evolving-Mind built by T€@X™  **
+**                                                                          **
+******************************************************************************
+```
+
 # Quadralith Cognitive Engine
 
 > A bounded, inspectable, and reversible Rust state machine with an explicit
