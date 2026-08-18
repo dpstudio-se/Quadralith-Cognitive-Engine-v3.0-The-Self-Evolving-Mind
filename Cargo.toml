@@ -1,0 +1,14 @@
+[package]
+name = "quadralith-cognitive-engine"
+version = "3.0.0"
+edition = "2021"
+description = "A bounded, inspectable state-machine implementation of the Quadralith cognitive architecture"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[profile.release]
+lto = true
+codegen-units = 1
+
