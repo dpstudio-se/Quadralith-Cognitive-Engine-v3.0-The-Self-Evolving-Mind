@@ -8,7 +8,7 @@
 pub mod core;
 
 pub use core::quadralith::{
-    CycleReport, EngineConfig, EngineError, EngineSnapshot, LearningSpiral,
-    OriginCore, PerformanceMode, QuadralithEngine, SelectionVector, SilentGlyph,
-    TeaxBatchReport, TeaxProfile, TransparencyField, TEAX_SIGNATURE,
+    CycleReport, EngineConfig, EngineError, EngineSnapshot, LearningSpiral, OriginCore,
+    PerformanceMode, QuadralithEngine, SelectionVector, SilentGlyph, TeaxBatchReport, TeaxProfile,
+    TransparencyField, TEAX_SIGNATURE,
 };

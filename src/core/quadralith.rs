@@ -135,7 +135,9 @@ impl EngineConfig {
         .all(f32::is_finite);
 
         if !finite {
-            return Err(EngineError::InvalidConfig("all numeric values must be finite"));
+            return Err(EngineError::InvalidConfig(
+                "all numeric values must be finite",
+            ));
         }
         if self.cycle_hz <= 0.0 {
             return Err(EngineError::InvalidConfig("cycle_hz must be positive"));
@@ -155,7 +157,9 @@ impl EngineConfig {
             return Err(EngineError::InvalidConfig("thresholds must be positive"));
         }
         if self.history_capacity == 0 {
-            return Err(EngineError::InvalidConfig("history_capacity must be non-zero"));
+            return Err(EngineError::InvalidConfig(
+                "history_capacity must be non-zero",
+            ));
         }
         Ok(())
     }
@@ -362,10 +366,7 @@ impl QuadralithEngine {
     /// This is the T€@X™ full-performance path: it avoids allocating a vector of
     /// per-cycle reports while preserving normal validation, snapshots, and the
     /// safety latch.
-    pub fn run_teax_batch(
-        &mut self,
-        stimuli: &[f32],
-    ) -> Result<TeaxBatchReport, EngineError> {
+    pub fn run_teax_batch(&mut self, stimuli: &[f32]) -> Result<TeaxBatchReport, EngineError> {
         if !self.teax_full_performance_enabled() {
             return Err(EngineError::TeaxProfileRequired);
         }
@@ -410,7 +411,9 @@ impl QuadralithEngine {
             return Err(EngineError::InvalidInput("stimulus must be finite"));
         }
         if !dt_seconds.is_finite() || dt_seconds <= 0.0 {
-            return Err(EngineError::InvalidInput("dt_seconds must be finite and positive"));
+            return Err(EngineError::InvalidInput(
+                "dt_seconds must be finite and positive",
+            ));
         }
         self.validate_state()?;
         self.push_snapshot();
@@ -421,37 +424,24 @@ impl QuadralithEngine {
         let phase = (TAU * self.config.phase_hz * self.elapsed_seconds as f32).rem_euclid(TAU);
 
         // ॐ — bounded identity and drive integration.
-        self.origin.metabolic_drive = (
-            self.origin.metabolic_drive
-                + external_entropy_stimulus * self.config.stimulus_gain_per_second * dt_seconds
-        )
+        self.origin.metabolic_drive = (self.origin.metabolic_drive
+            + external_entropy_stimulus * self.config.stimulus_gain_per_second * dt_seconds)
             .clamp(0.1, 100.0);
-        self.origin.identity_attractor = (
-            1.0 + phase.cos() * self.config.identity_modulation
-                + 0.01 * self.origin.metabolic_drive.tanh()
-        )
-            .clamp(0.5, 2.0);
-        self.origin.memory_lattice = (
-            self.origin.memory_lattice
-                + self.origin.metabolic_drive * self.config.memory_gain_per_second * dt_seconds
-        )
+        self.origin.identity_attractor = (1.0
+            + phase.cos() * self.config.identity_modulation
+            + 0.01 * self.origin.metabolic_drive.tanh())
+        .clamp(0.5, 2.0);
+        self.origin.memory_lattice = (self.origin.memory_lattice
+            + self.origin.metabolic_drive * self.config.memory_gain_per_second * dt_seconds)
             .clamp(0.0, 100.0);
 
         // α — plastic response, explicitly bounded.
-        self.learning.noosphere_resonance = (
-            self.origin.identity_attractor * (phase.sin() + 1.1)
-        )
-            .clamp(0.0, 4.2);
-        self.learning.adaptive_gradient = (
-            self.learning.noosphere_resonance * 0.65
-        )
-            .clamp(0.0, 3.0);
-        self.learning.baldwin_scaffold = (
-            self.learning.baldwin_scaffold
-                + self.learning.adaptive_gradient
-                    * self.config.scaffold_gain_per_second
-                    * dt_seconds
-        )
+        self.learning.noosphere_resonance =
+            (self.origin.identity_attractor * (phase.sin() + 1.1)).clamp(0.0, 4.2);
+        self.learning.adaptive_gradient =
+            (self.learning.noosphere_resonance * 0.65).clamp(0.0, 3.0);
+        self.learning.baldwin_scaffold = (self.learning.baldwin_scaffold
+            + self.learning.adaptive_gradient * self.config.scaffold_gain_per_second * dt_seconds)
             .clamp(0.0, 100.0);
 
         // Ω — overload response plus a reproducible 1.4% exploratory impulse.
@@ -465,10 +455,8 @@ impl QuadralithEngine {
         };
 
         if overload > 0.0 {
-            self.selection.mutation_engine = (
-                overload * self.config.mutation_gain + exploratory_impulse
-            )
-                .clamp(0.0, 20.0);
+            self.selection.mutation_engine =
+                (overload * self.config.mutation_gain + exploratory_impulse).clamp(0.0, 20.0);
             self.selection.replication_arbiter *=
                 (-self.config.replication_prune_per_second * dt_seconds).exp();
             self.system_entropy += self.selection.mutation_engine * dt_seconds;
@@ -480,15 +468,13 @@ impl QuadralithEngine {
                 self.config.replication_recovery_per_second * dt_seconds;
             self.system_entropy = (self.system_entropy - 0.1 * dt_seconds).max(0.0);
         }
-        self.selection.replication_arbiter =
-            self.selection.replication_arbiter.clamp(0.05, 2.0);
+        self.selection.replication_arbiter = self.selection.replication_arbiter.clamp(0.05, 2.0);
 
         // φ — audit projection and numerical damping. With nominal dt, entropy
         // is divided by phi_1766 once per cycle.
         self.transparency.attractor_mirror =
             self.origin.identity_attractor / self.transparency.phi_1766_cooling;
-        let cooling_rate =
-            self.config.cycle_hz * self.transparency.phi_1766_cooling.ln();
+        let cooling_rate = self.config.cycle_hz * self.transparency.phi_1766_cooling.ln();
         let entropy_after_load = self.system_entropy.max(0.0);
         self.system_entropy *= (-cooling_rate * dt_seconds).exp();
         let removed_load = (entropy_after_load - self.system_entropy).max(0.0);
@@ -574,15 +560,21 @@ impl QuadralithEngine {
         .into_iter()
         .all(f32::is_finite);
         if !finite || !self.elapsed_seconds.is_finite() {
-            return Err(EngineError::InvalidState("state contains a non-finite value"));
+            return Err(EngineError::InvalidState(
+                "state contains a non-finite value",
+            ));
         }
         if self.origin.identity_attractor < 0.5 - EPSILON
             || self.origin.identity_attractor > 2.0 + EPSILON
         {
-            return Err(EngineError::InvalidState("identity attractor is outside bounds"));
+            return Err(EngineError::InvalidState(
+                "identity attractor is outside bounds",
+            ));
         }
         if self.system_entropy < -EPSILON {
-            return Err(EngineError::InvalidState("system entropy cannot be negative"));
+            return Err(EngineError::InvalidState(
+                "system entropy cannot be negative",
+            ));
         }
         Ok(())
     }
