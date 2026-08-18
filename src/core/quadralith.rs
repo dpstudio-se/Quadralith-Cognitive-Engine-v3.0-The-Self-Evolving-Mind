@@ -654,8 +654,10 @@ mod tests {
 
     #[test]
     fn history_is_bounded() {
-        let mut config = EngineConfig::default();
-        config.history_capacity = 3;
+        let config = EngineConfig {
+            history_capacity: 3,
+            ..EngineConfig::default()
+        };
         let mut engine = QuadralithEngine::with_config(config).unwrap();
         for _ in 0..10 {
             engine.cycle_8hz(0.0).unwrap();
@@ -708,8 +710,10 @@ mod tests {
 
     #[test]
     fn teax_full_rejects_missing_or_wrong_signature() {
-        let mut missing = EngineConfig::default();
-        missing.teax_profile = None;
+        let missing = EngineConfig {
+            teax_profile: None,
+            ..EngineConfig::default()
+        };
         assert_eq!(
             QuadralithEngine::with_config(missing).unwrap_err(),
             EngineError::TeaxProfileRequired
@@ -725,9 +729,11 @@ mod tests {
 
     #[test]
     fn standard_mode_can_run_without_teax_profile() {
-        let mut config = EngineConfig::default();
-        config.performance_mode = PerformanceMode::Standard;
-        config.teax_profile = None;
+        let config = EngineConfig {
+            performance_mode: PerformanceMode::Standard,
+            teax_profile: None,
+            ..EngineConfig::default()
+        };
         let mut engine = QuadralithEngine::with_config(config).unwrap();
         assert!(!engine.teax_full_performance_enabled());
         assert!(engine.cycle_8hz(0.0).is_ok());
