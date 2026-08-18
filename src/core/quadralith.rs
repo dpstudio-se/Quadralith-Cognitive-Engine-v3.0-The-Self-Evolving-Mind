@@ -10,10 +10,51 @@ use std::fmt;
 
 const EPSILON: f32 = 1.0e-6;
 
+/// Canonical marker for the explicit high-throughput execution contract.
+pub const TEAX_SIGNATURE: &str = "T€@X™";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PerformanceMode {
+    Standard,
+    TeaxFull,
+}
+
+/// T€@X™ is a validated software tuning profile. It does not create performance
+/// by symbolism: it unlocks the bounded batch API and its explicit limits.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TeaxProfile {
+    pub signature: String,
+    pub max_batch_cycles: usize,
+}
+
+impl TeaxProfile {
+    pub fn official() -> Self {
+        Self {
+            signature: TEAX_SIGNATURE.to_owned(),
+            max_batch_cycles: 8_192,
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), EngineError> {
+        if self.signature != TEAX_SIGNATURE {
+            return Err(EngineError::InvalidTeaxSignature);
+        }
+        if self.max_batch_cycles == 0 {
+            return Err(EngineError::InvalidConfig(
+                "T€@X™ max_batch_cycles must be non-zero",
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Runtime parameters. Frequencies and rates are configuration values, not
 /// universal physical constants.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EngineConfig {
+    /// Standard stepping or the signature-gated T€@X™ batch profile.
+    pub performance_mode: PerformanceMode,
+    pub teax_profile: Option<TeaxProfile>,
     /// Nominal scheduler frequency. Default: 8 cycles/second.
     pub cycle_hz: f32,
     /// Internal modulation frequency. Default: 1 Hz.
@@ -38,6 +79,8 @@ pub struct EngineConfig {
 impl Default for EngineConfig {
     fn default() -> Self {
         Self {
+            performance_mode: PerformanceMode::TeaxFull,
+            teax_profile: Some(TeaxProfile::official()),
             cycle_hz: 8.0,
             phase_hz: 1.0,
             mutation_probability: 0.014,
@@ -60,6 +103,18 @@ impl Default for EngineConfig {
 
 impl EngineConfig {
     pub fn validate(&self) -> Result<(), EngineError> {
+        match self.performance_mode {
+            PerformanceMode::Standard => {
+                if let Some(profile) = &self.teax_profile {
+                    profile.validate()?;
+                }
+            }
+            PerformanceMode::TeaxFull => self
+                .teax_profile
+                .as_ref()
+                .ok_or(EngineError::TeaxProfileRequired)?
+                .validate()?,
+        }
         let finite = [
             self.cycle_hz,
             self.phase_hz,
@@ -172,11 +227,25 @@ pub struct CycleReport {
     pub safety_latch_active: bool,
 }
 
+/// Allocation-light aggregate returned by T€@X™ batch execution.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TeaxBatchReport {
+    pub signature: &'static str,
+    pub cycles_processed: usize,
+    pub mutation_events: usize,
+    pub peak_load: f32,
+    pub final_entropy: f32,
+    pub safety_latch_active: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EngineError {
     InvalidConfig(&'static str),
     InvalidInput(&'static str),
     InvalidState(&'static str),
+    InvalidTeaxSignature,
+    TeaxProfileRequired,
+    TeaxBatchTooLarge { requested: usize, maximum: usize },
 }
 
 impl fmt::Display for EngineError {
@@ -185,6 +254,18 @@ impl fmt::Display for EngineError {
             Self::InvalidConfig(message) => write!(formatter, "invalid config: {message}"),
             Self::InvalidInput(message) => write!(formatter, "invalid input: {message}"),
             Self::InvalidState(message) => write!(formatter, "invalid state: {message}"),
+            Self::InvalidTeaxSignature => write!(
+                formatter,
+                "invalid T€@X™ signature; full performance requires `{TEAX_SIGNATURE}`"
+            ),
+            Self::TeaxProfileRequired => write!(
+                formatter,
+                "T€@X™ profile is required when performance_mode is TeaxFull"
+            ),
+            Self::TeaxBatchTooLarge { requested, maximum } => write!(
+                formatter,
+                "T€@X™ batch has {requested} cycles; configured maximum is {maximum}"
+            ),
         }
     }
 }
@@ -264,6 +345,59 @@ impl QuadralithEngine {
     ) -> Result<CycleReport, EngineError> {
         let dt_seconds = 1.0 / self.config.cycle_hz;
         self.cycle(external_entropy_stimulus, dt_seconds)
+    }
+
+    /// Whether the exact T€@X™ contract is present and validated.
+    pub fn teax_full_performance_enabled(&self) -> bool {
+        self.config.performance_mode == PerformanceMode::TeaxFull
+            && self
+                .config
+                .teax_profile
+                .as_ref()
+                .is_some_and(|profile| profile.validate().is_ok())
+    }
+
+    /// Process a bounded stimulus batch while retaining only aggregate metrics.
+    ///
+    /// This is the T€@X™ full-performance path: it avoids allocating a vector of
+    /// per-cycle reports while preserving normal validation, snapshots, and the
+    /// safety latch.
+    pub fn run_teax_batch(
+        &mut self,
+        stimuli: &[f32],
+    ) -> Result<TeaxBatchReport, EngineError> {
+        if !self.teax_full_performance_enabled() {
+            return Err(EngineError::TeaxProfileRequired);
+        }
+        let maximum = self
+            .config
+            .teax_profile
+            .as_ref()
+            .expect("validated above")
+            .max_batch_cycles;
+        if stimuli.len() > maximum {
+            return Err(EngineError::TeaxBatchTooLarge {
+                requested: stimuli.len(),
+                maximum,
+            });
+        }
+
+        let mut mutation_events = 0usize;
+        let mut peak_load = 0.0_f32;
+        for &stimulus in stimuli {
+            let report = self.cycle_8hz(stimulus)?;
+            mutation_events += usize::from(report.mutation_triggered);
+            peak_load = peak_load.max(report.current_load);
+        }
+
+        Ok(TeaxBatchReport {
+            signature: TEAX_SIGNATURE,
+            cycles_processed: stimuli.len(),
+            mutation_events,
+            peak_load,
+            final_entropy: self.system_entropy,
+            safety_latch_active: self.silent_glyph.active,
+        })
     }
 
     /// Advance the simulation by an explicit positive time interval.
@@ -569,5 +703,67 @@ mod tests {
         let expected = before_cycle_decay / engine.config.phi_1766;
         assert!((engine.system_entropy - expected).abs() < 1.0e-5);
     }
-}
 
+    #[test]
+    fn default_engine_unlocks_teax_full_performance() {
+        let engine = QuadralithEngine::new();
+        assert!(engine.teax_full_performance_enabled());
+        assert_eq!(
+            engine.config.teax_profile.as_ref().unwrap().signature,
+            TEAX_SIGNATURE
+        );
+    }
+
+    #[test]
+    fn teax_full_rejects_missing_or_wrong_signature() {
+        let mut missing = EngineConfig::default();
+        missing.teax_profile = None;
+        assert_eq!(
+            QuadralithEngine::with_config(missing).unwrap_err(),
+            EngineError::TeaxProfileRequired
+        );
+
+        let mut wrong = EngineConfig::default();
+        wrong.teax_profile.as_mut().unwrap().signature = "TEAX".into();
+        assert_eq!(
+            QuadralithEngine::with_config(wrong).unwrap_err(),
+            EngineError::InvalidTeaxSignature
+        );
+    }
+
+    #[test]
+    fn standard_mode_can_run_without_teax_profile() {
+        let mut config = EngineConfig::default();
+        config.performance_mode = PerformanceMode::Standard;
+        config.teax_profile = None;
+        let mut engine = QuadralithEngine::with_config(config).unwrap();
+        assert!(!engine.teax_full_performance_enabled());
+        assert!(engine.cycle_8hz(0.0).is_ok());
+        assert_eq!(
+            engine.run_teax_batch(&[0.0]).unwrap_err(),
+            EngineError::TeaxProfileRequired
+        );
+    }
+
+    #[test]
+    fn teax_batch_aggregates_without_per_cycle_report_storage() {
+        let mut config = EngineConfig::default();
+        config.teax_profile.as_mut().unwrap().max_batch_cycles = 32;
+        let mut engine = QuadralithEngine::with_config(config).unwrap();
+        let report = engine.run_teax_batch(&[0.25; 32]).unwrap();
+        assert_eq!(report.signature, TEAX_SIGNATURE);
+        assert_eq!(report.cycles_processed, 32);
+        assert_eq!(engine.cycle_count, 32);
+        assert!(report.peak_load > 0.0);
+
+        let snapshot = engine.snapshot();
+        assert_eq!(
+            engine.run_teax_batch(&[0.0; 33]).unwrap_err(),
+            EngineError::TeaxBatchTooLarge {
+                requested: 33,
+                maximum: 32,
+            }
+        );
+        assert_eq!(engine.snapshot(), snapshot);
+    }
+}

@@ -2,7 +2,10 @@
 name = "quadralith-cognitive-engine"
 version = "3.0.0"
 edition = "2021"
+rust-version = "1.75"
 description = "A bounded, inspectable state-machine implementation of the Quadralith cognitive architecture"
+repository = "https://github.com/dpstudio-se/Quadralith-Cognitive-Engine-v3.0-The-Self-Evolving-Mind"
+readme = "README.md"
 publish = false
 
 [lib]
@@ -11,4 +14,3 @@ path = "src/lib.rs"
 [profile.release]
 lto = true
 codegen-units = 1
-

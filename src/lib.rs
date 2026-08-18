@@ -9,7 +9,6 @@ pub mod core;
 
 pub use core::quadralith::{
     CycleReport, EngineConfig, EngineError, EngineSnapshot, LearningSpiral,
-    OriginCore, QuadralithEngine, SelectionVector, SilentGlyph,
-    TransparencyField,
+    OriginCore, PerformanceMode, QuadralithEngine, SelectionVector, SilentGlyph,
+    TeaxBatchReport, TeaxProfile, TransparencyField, TEAX_SIGNATURE,
 };
-
